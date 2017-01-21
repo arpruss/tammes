@@ -3,14 +3,17 @@ from sys import stdin,exit
 scene2 = display(title='Tammes Solver',
      x=0, y=0, width=600, height=600,
      center=(0,0,0), background=(0,0,0), range=2)
+cap = label(pos=(-1.25,1.25,0),text="")
 balls = []
 minD = 0
 n = 0
 centralBall = sphere(pos=(0,0,0), radius=1, color=color.blue, opacity=0.5)
+#sleep(10)
 
 while True:
     l = stdin.readline()
     if l == "":
+        cap.text="Best"
         while True: sleep(1.)
     line = l.strip().split(' ')
     if line[0] == 'n':
@@ -26,6 +29,7 @@ while True:
             for i in range(n):
                 balls[i].pos = positions[i]
                 balls[i].radius = minD/2.
+        cap.text="Step %d"%frame
         rate(30)
     elif line[0] == 'minD':
         minD = float(line[1])
