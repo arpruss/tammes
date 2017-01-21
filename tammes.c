@@ -171,7 +171,7 @@ void update(double approxDx,double p,double minus,double friction) {
 }
 
 void usage(void) {
-    fprintf(stderr, "tammes-newton [-animate] nPoints [nIterations [frictionMultiplier]]\n");
+    fprintf(stderr, "tammes [-animate | -scad] [-repeat repeatCount] [-friction frictionMultiplier] nPoints [nIterations]\n");
 }
 
 void dumpFrame(int frameCount, vec3* positions, double minD) {
@@ -187,14 +187,41 @@ main(int argc, char** argv) {
 	int nIter = 500;
     int repeats = 1;
     int animation = 0;
+    int scad = 0;
     double frictionMultiplier = 0.16;
     
-    if (argc >= 2 && ! strncmp(argv[1], "-a", 2)) {
-        animation = 1;
+    while (argc >= 2 && argv[1][0] == '-') {
+        switch(argv[1][1]) {
+            case 'a':
+                animation = 1;
+                break;
+            case 's':
+                scad = 1;
+                break;
+            case 'r':
+                if (argc < 3) {
+                    usage();
+                    return;
+                }
+                repeats = atoi(argv[2]);
+                argc--;
+                argv++;
+                break;
+            case 'f':
+                if (argc < 3) {
+                    usage();
+                    return;
+                }
+                frictionMultiplier = atof(argv[2]);
+                argc--;
+                argv++;
+                break;
+            default:
+                break;
+        }
         argc--;
         argv++;
     }
-
     
     if (argc < 2) {
         usage();
@@ -218,71 +245,74 @@ main(int argc, char** argv) {
     
 // impose antipodal symmetry (or almost if N is odd), using idea of https://math.mit.edu/research/highschool/rsi/documents/2012Gautam.pdf
     int N0 = (N+1)/2;
-    for (i=0;i<N0;i++) {
-        double n;
-        do {
-            pos[i].x = urandom();
-            pos[i].y = urandom();
-            pos[i].z = urandom();
-            n = norm(&pos[i]);
-        } while (n > 1 || n == 0.);
-        pos[i].x /= n;
-        pos[i].x /= n;
-        pos[i].x /= n;
-        v[i].x = 0;
-        v[i].y = 0;
-        v[i].z = 0;
-        if (N0+i < N) {
-            pos[N0+i].x = -pos[i].x;
-            pos[N0+i].y = -pos[i].y;
-            pos[N0+i].z = -pos[i].z;
-            v[N0+i].x = 0;
-            v[N0+i].y = 0;
-            v[N0+i].z = 0;
-        }
-    }
-    
-    double nextShow = 0;
 
-    calculateMinD();
-    
-    if (animation) {
-        printf("n %d\n",N);
-        dumpFrame(0,pos,minD);
-    }
-
-    for (i=0;i<nIter;i++) {
-        double p = 1+i*(8.-1)/nIter;
-        if (p>4.5) p=4.5;
-        // 7,4.5,3,10,0 : 0.153
-        double minus;
-        if (p >= 1) {
-            minus = 0.9 * minD * i / nIter;
-        }
-        else {
-            minus = 0;
-        }
-        update(.3*minD+0.00000001, p, minus, frictionMultiplier*N); // 0.0005/N,p); 
-        if (minD > bestMinD) {
-            int j;
-            for(j=0;j<N;j++) {
-                best[j] = pos[j];
+    int r;
+    for (r=0;r<repeats;r++) {
+        for (i=0;i<N0;i++) {
+            double n;
+            do {
+                pos[i].x = urandom();
+                pos[i].y = urandom();
+                pos[i].z = urandom();
+                n = norm(&pos[i]);
+            } while (n > 1 || n == 0.);
+            pos[i].x /= n;
+            pos[i].x /= n;
+            pos[i].x /= n;
+            v[i].x = 0;
+            v[i].y = 0;
+            v[i].z = 0;
+            if (N0+i < N) {
+                pos[N0+i].x = -pos[i].x;
+                pos[N0+i].y = -pos[i].y;
+                pos[N0+i].z = -pos[i].z;
+                v[N0+i].x = 0;
+                v[N0+i].y = 0;
+                v[N0+i].z = 0;
             }
-            bestMinD = minD;
         }
-        if ((double)i/(nIter-1) >= nextShow || i == nIter-1) {
-            fprintf(stderr, "%.0f%% minD=%.5f maxMinD=%.5f bestD=%.5f bestMaxMinD=%.5f p=%.5f       \r", 100.*i/(nIter-1), minD, maxMinD(pos), bestMinD, maxMinD(best), p);
-            nextShow += 0.05;
+        
+        double nextShow = 0;
+
+        calculateMinD();
+        
+        if (animation) {
+            printf("n %d\n",N);
+            dumpFrame(0,pos,minD);
         }
-        if (animation) 
-            dumpFrame(i+1,pos,minD);
+
+        for (i=0;i<nIter;i++) {
+            double p = 1+i*(8.-1)/nIter;
+            if (p>4.5) p=4.5;
+            // 7,4.5,3,10,0 : 0.153
+            double minus;
+            if (p >= 1) {
+                minus = 0.9 * minD * i / nIter;
+            }
+            else {
+                minus = 0;
+            }
+            update(.3*minD+0.00000001, p, minus, frictionMultiplier*N); // 0.0005/N,p); 
+            if (minD > bestMinD) {
+                int j;
+                for(j=0;j<N;j++) {
+                    best[j] = pos[j];
+                }
+                bestMinD = minD;
+            }
+            if ((double)i/(nIter-1) >= nextShow || i == nIter-1) {
+                fprintf(stderr, "%.0f%% minD=%.5f maxMinD=%.5f bestD=%.5f bestMaxMinD=%.5f p=%.5f       \r", 100.*i/(nIter-1), minD, maxMinD(pos), bestMinD, maxMinD(best), p);
+                nextShow += 0.05;
+            }
+            if (animation) 
+                dumpFrame(i+1,pos,minD);
+        }
     }
     fprintf(stderr, "\n");
 
     if (animation)
         dumpFrame(nIter+1,best,bestMinD);
-    
-    if (!animation) {
+    else if (scad) {
         printf("n=%d;\nminD=%.9f;\n", N, bestMinD);
         //printf("bumpR = 2*sin((1/2)*asin(minD/2));\n");
         printf("points = [");
@@ -292,6 +322,11 @@ main(int argc, char** argv) {
         }
         printf ("];\n");
         puts("difference() {\n sphere(r=1,$fn=36);\n for(i=[0:len(points)-1]) translate(points[i]) sphere(d=minD,$fn=12);\n}\n");
+    }
+    else {
+        for(i=0;i<N;i++) {
+            printf("%.9f %.9f %.9f\n", best[i].x, best[i].y, best[i].z);
+        }
     }
 
     free(v);
