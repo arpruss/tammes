@@ -180,6 +180,7 @@ void dumpFrame(int frameCount, vec3* positions, double minD) {
     for(i=0;i<N;i++) 
         printf("pos %d %.9f %.9f %.9f\n", i, positions[i].x, positions[i].y, positions[i].z);
     printf("frame %d\n", frameCount);
+    fflush(stdout);
 }
 
 int
@@ -257,8 +258,8 @@ main(int argc, char** argv) {
                 n = norm(&pos[i]);
             } while (n > 1 || n == 0.);
             pos[i].x /= n;
-            pos[i].x /= n;
-            pos[i].x /= n;
+            pos[i].y /= n;
+            pos[i].z /= n;
             v[i].x = 0;
             v[i].y = 0;
             v[i].z = 0;
