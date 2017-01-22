@@ -4,6 +4,10 @@
 #include <math.h>
 #include <time.h>
 
+#ifndef M_PI
+# define M_PI 3.141592653589793
+#endif
+
 int N;
 double minD = 0;
 double bestMinD = 0;
@@ -170,6 +174,16 @@ void update(double approxDx,double p,double minus,double friction) {
     free(newV);
 }
 
+double latitude(vec3* v) {
+    return 180. / M_PI * atan2(v->z, sqrt(v->x*v->x+v->y*v->y));
+}
+
+double longitude(vec3* v) {
+    if (v->x == 0 && v->y == 0)
+        return 0;
+    return 180. / M_PI * atan2(v->x, v->y);
+}
+
 void usage(void) {
     fprintf(stderr, "tammes [-animate | -scad] [-repeat repeatCount] [-friction frictionMultiplier] nPoints [nIterations]\n");
 }
@@ -318,11 +332,20 @@ main(int argc, char** argv) {
         //printf("bumpR = 2*sin((1/2)*asin(minD/2));\n");
         printf("points = [");
         for(i=0;i<N;i++) {
-            printf("[%.9f,%.9f,%.9f]", best[i].x, best[i].y, best[i].z);
+            printf("[%.9f,%.9f]", latitude(&best[i]), longitude(&best[i]));
             if (i+1 < N) putchar(',');
         }
-        printf ("];\n");
-        puts("difference() {\n sphere(r=1,$fn=36);\n for(i=[0:len(points)-1]) translate(points[i]) sphere(d=minD,$fn=12);\n}\n");
+        puts ("];\n\n");
+        puts ("module dimple() {");
+        puts (" translate([0,0,1]) sphere(d=minD,$fn=12);");
+        puts ("}\n");
+        puts ("module dimples() {");
+        puts (" union() {");
+        puts ("  for(i=[0:len(points)-1]) rotate([0,0,points[i][1]]) rotate([90-points[i][0],0,0]) dimple();");
+        puts (" }");
+        puts ("}\n");
+        puts ("render(convexity=2)");
+        puts("difference() {\n sphere(r=1,$fn=36);\n dimples();\n}");
     }
     else {
         for(i=0;i<N;i++) {
