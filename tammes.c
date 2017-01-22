@@ -315,7 +315,8 @@ main(int argc, char** argv) {
         for (i=0;i<N;i++)
             best[i] = pos[i];
         calculateMinD();
-        bestMinD = minD;
+        if (bestMinD <= minD)
+            bestMinD = minD;
         
         if (animation) {
             printf("n %d\n",N);
