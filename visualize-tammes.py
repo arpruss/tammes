@@ -8,7 +8,6 @@ balls = []
 minD = 0
 n = 0
 centralBall = sphere(pos=(0,0,0), radius=1, color=color.blue, opacity=0.5)
-sleep(10)
 
 while True:
     l = stdin.readline()

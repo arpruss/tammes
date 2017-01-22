@@ -8,6 +8,9 @@
 # define M_PI 3.141592653589793
 #endif
 
+#define GA 2.39996322972865332
+
+int asymmetric = 1;
 int N;
 double minD = 0;
 double bestMinD = 0;
@@ -54,7 +57,7 @@ void calculateMinD(void) {
     double minD2 = 4;
     int i;
 
-    int N0 = (N % 2) ? N : N/2;
+    int N0 = (N % 2 || asymmetric) ? N : N/2;
 
     for (i=0;i<N0;i++) {
         double d2;
@@ -97,7 +100,7 @@ void update(double approxDx,double p,double minus,double friction) {
     double maxV = 0;
     double thisV;
     
-    int N0 = (N % 2) ? N : N/2;
+    int N0 = (N % 2 || asymmetric) ? N : N/2;
 
     vec3* newV = safemalloc(sizeof(vec3) * N0);
     
@@ -203,10 +206,14 @@ main(int argc, char** argv) {
     int repeats = 1;
     int animation = 0;
     int scad = 0;
+    int golden = 0;
     double frictionMultiplier = 0.16;
     
     while (argc >= 2 && argv[1][0] == '-') {
         switch(argv[1][1]) {
+            case 'g':
+                golden = 1;
+                break;
             case 'a':
                 animation = 1;
                 break;
@@ -216,7 +223,7 @@ main(int argc, char** argv) {
             case 'r':
                 if (argc < 3) {
                     usage();
-                    return;
+                    return 1;
                 }
                 repeats = atoi(argv[2]);
                 argc--;
@@ -225,7 +232,7 @@ main(int argc, char** argv) {
             case 'f':
                 if (argc < 3) {
                     usage();
-                    return;
+                    return 1;
                 }
                 frictionMultiplier = atof(argv[2]);
                 argc--;
@@ -243,6 +250,9 @@ main(int argc, char** argv) {
         return 1;
     }
     
+    if (golden)
+        asymmetric = 1;
+    
     N = atoi(argv[1]);
     if (argc >= 3) {
         nIter = atoi(argv[2]);
@@ -259,31 +269,44 @@ main(int argc, char** argv) {
     int i;
     
 // impose antipodal symmetry (or almost if N is odd), using idea of https://math.mit.edu/research/highschool/rsi/documents/2012Gautam.pdf
-    int N0 = (N+1)/2;
+    int N0 = asymmetric ? N : (N+1)/2;
 
     int r;
     for (r=0;r<repeats;r++) {
-        for (i=0;i<N0;i++) {
-            double n;
-            do {
-                pos[i].x = urandom();
-                pos[i].y = urandom();
-                pos[i].z = urandom();
-                n = norm(&pos[i]);
-            } while (n > 1 || n == 0.);
-            pos[i].x /= n;
-            pos[i].y /= n;
-            pos[i].z /= n;
-            v[i].x = 0;
-            v[i].y = 0;
-            v[i].z = 0;
-            if (N0+i < N) {
-                pos[N0+i].x = -pos[i].x;
-                pos[N0+i].y = -pos[i].y;
-                pos[N0+i].z = -pos[i].z;
-                v[N0+i].x = 0;
-                v[N0+i].y = 0;
-                v[N0+i].z = 0;
+        if (golden) {
+            for (i=0;i<N;i++) {
+                double ratio = (double)(i+1)/(N+2);
+                pos[i].x = 2 * sqrt( (1-ratio) * ratio ) * cos(i * GA);
+                pos[i].y = 2 * sqrt( (1-ratio) * ratio ) * sin(i * GA);
+                pos[i].z = 1-2*ratio;
+                v[i].x = 0;
+                v[i].y = 0;
+                v[i].z = 0;
+            }
+        }
+        else {
+            for (i=0;i<N0;i++) {
+                double n;
+                do {
+                    pos[i].x = urandom();
+                    pos[i].y = urandom();
+                    pos[i].z = urandom();
+                    n = norm(&pos[i]);
+                } while (n > 1 || n == 0.);
+                pos[i].x /= n;
+                pos[i].y /= n;
+                pos[i].z /= n;
+                v[i].x = 0;
+                v[i].y = 0;
+                v[i].z = 0;
+                if (N0+i < N) {
+                    pos[N0+i].x = -pos[i].x;
+                    pos[N0+i].y = -pos[i].y;
+                    pos[N0+i].z = -pos[i].z;
+                    v[N0+i].x = 0;
+                    v[N0+i].y = 0;
+                    v[N0+i].z = 0;
+                }
             }
         }
         
