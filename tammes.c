@@ -275,7 +275,7 @@ main(int argc, char** argv) {
     for (r=0;r<repeats;r++) {
         if (golden) {
             for (i=0;i<N;i++) {
-                double ratio = (double)(i+1)/(N+2);
+                double ratio = (double)(i+1)/(N+1);
                 pos[i].x = 2 * sqrt( (1-ratio) * ratio ) * cos(i * GA);
                 pos[i].y = 2 * sqrt( (1-ratio) * ratio ) * sin(i * GA);
                 pos[i].z = 1-2*ratio;
@@ -312,7 +312,10 @@ main(int argc, char** argv) {
         
         double nextShow = 0;
 
+        for (i=0;i<N;i++)
+            best[i] = pos[i];
         calculateMinD();
+        bestMinD = minD;
         
         if (animation) {
             printf("n %d\n",N);
