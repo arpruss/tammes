@@ -30,6 +30,13 @@ double norm(vec3* v) {
     return sqrt(v->x*v->x+v->y*v->y+v->z*v->z);
 }
 
+void normalize(vec3* v) {
+    double n = norm(v);
+    v->x /= n;
+    v->y /= n;
+    v->z /= n;
+}
+
 double distance(vec3* v1,vec3* v2) {
     double dx = v1->x-v2->x;
     double dy = v1->y-v2->y;
@@ -53,6 +60,34 @@ void *safemalloc(long n) {
     return p;
 }
 
+void closest(vec3* pos, int i, int n, double* d, int* index) {
+    int j;
+    for (j=0; j<n; j++) {
+        d[j] = 3;
+        index[j] = -1;
+    }
+    for (j=0; j<N; j++) {
+        double dist;
+        if (j != i) {
+            dist = distance(&pos[j], &pos[i]);
+            int k;
+            if (dist < d[n-1]) {
+                k = n-1;
+                while (k > 0 && dist < d[k-1]) {
+                    k--;
+                }
+                int l;
+                for (l=n-1 ; l > k ; l--) {
+                    d[l] = d[l-1];
+                    index[l] = index[l-1];
+                }
+                d[k] = dist;
+                index[k] = j;
+            }
+        }
+    }
+}
+
 void calculateMinD(void) {
     double minD2 = 4;
     int i;
@@ -74,9 +109,9 @@ double maxMinD(vec3* pos) {
     double maxMinD2 = -1;
     int i;
 
-    int N0 = (N % 2) ? N : N/2;
+//    int N0 = (N % 2) ? N : N/2;
 
-    for (i=0;i<N0;i++) {
+    for (i=0;i<N;i++) {
         double minD2;
         double d2;
         int j;
@@ -95,7 +130,8 @@ double maxMinD(vec3* pos) {
 }
 
 void update(double approxDx,double p,double minus,double friction) {
-    int i,j;
+    int i;
+    int j;
     
     double maxV = 0;
     double thisV;
@@ -120,7 +156,6 @@ void update(double approxDx,double p,double minus,double friction) {
 #pragma omp parallel
 #pragma omp for private(i,j)
     for (i=0;i<N0;i++) {        
-        double n;
         double d;
         double factor;
         newV[i].x = v[i].x * (1. - dt * friction);
@@ -198,6 +233,81 @@ void dumpFrame(int frameCount, vec3* positions, double minD) {
         printf("pos %d %.9f %.9f %.9f\n", i, positions[i].x, positions[i].y, positions[i].z);
     printf("frame %d\n", frameCount);
     fflush(stdout);
+}
+
+double minDAmongNeighbors(vec3* pos, vec3* base, int* neighbors) {
+    int j;
+    double closestD = 3;
+    for (j=0; j<6; j++) {
+        double d = distance(base, &pos[neighbors[j]]);
+        if (d<closestD) 
+            closestD = d;
+    }
+    return closestD;
+}
+
+void cleanupFrom(vec3* from, vec3* pos, int i, int* neighbors, double eps, double maxMove) {
+    vec3 move;
+    
+    move.x = pos[i].x - from->x;
+    move.y = pos[i].y - from->y;
+    move.z = pos[i].z - from->z;
+    normalize(&move);
+
+    double a;
+    
+    double myMinD = minDAmongNeighbors(pos, &pos[i], neighbors);
+    printf("Cleaning %d %g %g\n", i, myMinD, maxMove);
+    vec3 adjusted;
+    vec3 base = pos[i];
+    
+    for (a = eps; a <= maxMove; a += eps) {
+        adjusted.x = base.x + a * move.x;
+        adjusted.y = base.y + a * move.y;
+        adjusted.z = base.z + a * move.z;
+        normalize(&adjusted);
+        double adjMinD = minDAmongNeighbors(pos, &adjusted, neighbors);
+        if (adjMinD < myMinD)
+            break;
+        myMinD = adjMinD;
+        pos[i] = adjusted;
+    }
+    printf("Cleaned %d %g\n", i, myMinD);
+}
+
+void cleanupPoint(vec3* pos, int i, double eps) {
+    if (N<7)
+        return; // we don't usually need this step for small numbers
+
+    double d[6];
+    int index[6];
+    
+    closest(pos, i, 6, d, index);
+    if (d[3]-d[0] <= eps)
+        return;
+    
+    if (d[1]-d[0] > eps) {
+        cleanupFrom(&pos[index[0]], pos, i, index, eps, d[4]-d[0]);
+    }
+        
+    closest(pos, i, 6, d, index);
+    if (d[2]-d[0] > eps) {
+        vec3 source;
+        source.x = 0.5 * (pos[index[0]].x + pos[index[1]].x);
+        source.y = 0.5 * (pos[index[0]].y + pos[index[1]].y);
+        source.z = 0.5 * (pos[index[0]].z + pos[index[1]].z);
+        cleanupFrom(&source, pos, i, index, eps, d[4]-d[0]);
+    }
+}
+
+void cleanup(vec3* pos, double eps) {
+    if (N<7)
+        return; // we don't usually need this step for small numbers
+    int i;
+
+    for (i=0;i<N;i++) {
+        cleanupPoint(pos, i, eps);
+    }
 }
 
 int
@@ -312,11 +422,12 @@ main(int argc, char** argv) {
         
         double nextShow = 0;
 
-        for (i=0;i<N;i++)
-            best[i] = pos[i];
         calculateMinD();
-        if (bestMinD <= minD)
+        if (bestMinD <= minD) {
+            for (i=0;i<N;i++)
+                best[i] = pos[i];
             bestMinD = minD;
+        }
         
         if (animation) {
             printf("n %d\n",N);
@@ -349,11 +460,27 @@ main(int argc, char** argv) {
             if (animation) 
                 dumpFrame(i+1,pos,minD);
         }
-    }
-    fprintf(stderr, "\n");
+        fprintf(stderr, "\n");
 
+        if (N >= 7) {
+            for (i=0;i<N;i++)
+                pos[i] = best[i];
+            for (i=0;i<50;i++) {
+                cleanup(pos, minD * 0.001 / i);
+                calculateMinD();
+                if (animation) 
+                    dumpFrame(nIter+i,pos,minD);
+                fprintf(stderr, "clean(%d) minD=%.5f maxMinD=%.5f     \r", i, minD, maxMinD(pos));
+            }
+            bestMinD = minD;
+            for (i=0;i<N;i++)
+                best[i] = pos[i];
+            fprintf(stderr, "\n");
+        }
+    }
+    
     if (animation)
-        dumpFrame(nIter+1,best,bestMinD);
+        dumpFrame(nIter+N>=7?50+nIter:nIter,best,bestMinD);
     else if (scad) {
         printf("n=%d;\nminD=%.9f;\n", N, bestMinD);
         //printf("bumpR = 2*sin((1/2)*asin(minD/2));\n");
@@ -379,7 +506,7 @@ main(int argc, char** argv) {
             printf("%.9f %.9f %.9f\n", best[i].x, best[i].y, best[i].z);
         }
     }
-
+    
     free(v);
     free(best);
     free(pos);
