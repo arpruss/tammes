@@ -30,11 +30,22 @@ double norm(vec3* v) {
     return sqrt(v->x*v->x+v->y*v->y+v->z*v->z);
 }
 
+double norm2(vec3* v) {
+    return v->x*v->x+v->y*v->y+v->z*v->z;
+}
+
 void normalize(vec3* v) {
     double n = norm(v);
-    v->x /= n;
-    v->y /= n;
-    v->z /= n;
+    if (n == 0.) {
+        v->x = 1;
+        v->y = 0;
+        v->z = 0;
+    }
+    else {
+        v->x /= n;
+        v->y /= n;
+        v->z /= n;
+    }
 }
 
 double distance(vec3* v1,vec3* v2) {
@@ -58,6 +69,54 @@ void *safemalloc(long n) {
         exit(3);
     }
     return p;
+}
+
+vec3 add(vec3 a, vec3 b) {
+    vec3 c;
+    c.x = a.x + b.x;
+    c.y = a.y + b.y;
+    c.z = a.z + b.z;
+    return c;
+}
+
+vec3 sub(vec3 a, vec3 b) {
+    vec3 c;
+    c.x = a.x - b.x;
+    c.y = a.y - b.y;
+    c.z = a.z - b.z;
+    return c;
+}
+
+vec3 scale(double a, vec3 b) {
+    vec3 c;
+    c.x = a * b.x;
+    c.y = a * b.y;
+    c.z = a * b.z;
+    return c;
+}
+
+vec3 cross(vec3 a, vec3 b) {
+    vec3 c;
+    c.x = a.y * b.z - a.z * b.y;
+    c.y = a.z * b.x - a.x * b.z;
+    c.z = a.x * b.y - a.y * b.x;
+    return c;
+}
+
+// returns A if the points are not on a triangle
+vec3 circumcenter(vec3 A, vec3 B, vec3 C) {
+   // https://en.wikipedia.org/wiki/Circumscribed_circle
+    vec3 a = sub(A,C);
+    vec3 b = sub(B,C);
+    vec3 ab = cross(a,b);
+    vec3 top = cross(sub(scale(norm2(&a), b), scale(norm2(&b),a)), ab);
+    double n2 = norm2(&ab);
+    if (n2 == 0) {
+        return A;
+    }
+    else {
+        return add(C, scale(0.5/norm2(&ab), top));
+    }
 }
 
 void closest(vec3* pos, int i, int n, double* d, int* index) {
@@ -273,39 +332,55 @@ void cleanupFrom(vec3* from, vec3* pos, int i, int* neighbors, double eps, doubl
     }
 }
 
-void cleanupPoint(vec3* pos, int i, double eps) {
-    if (N<7)
-        return; // we don't usually need this step for small numbers
+double closestPointOtherThan(vec3* base, vec3* pos, int omit) {
+    double bestD2 = 3;
+    int i;
+    
+    for (i=0; i<N; i++) {
+        if (i != omit) {
+            double d2 = distanceSq(base, &pos[i]);
+            if (d2 < bestD2) {
+                bestD2 = d2;
+            }
+        }
+    }
 
+    return sqrt(bestD2);
+}
+
+// A bit of greedy local optimization where we try the circumcenters of all triangles
+// formed by the six closest neighbors of a given point to see if we can make the
+// given point do better.  
+void cleanupPointCircumcenter(vec3* pos, int i) {
     double d[6];
     int index[6];
     
     closest(pos, i, 6, d, index);
-    if (d[3]-d[0] <= eps)
-        return;
+
+    vec3 bestPoint = pos[i];
+    double bestD = 0;
+    double dist;
     
-    if (d[1]-d[0] > eps) {
-        cleanupFrom(&pos[index[0]], pos, i, index, eps, d[4]-d[0]);
+    int a,b,c;
+    for (a = 0; a < 6-2; a++) for(b = a+1; b < 6-1 ; b++) for (c = b+1 ; c < 6 ; c++) {
+        vec3 circ = circumcenter(pos[index[a]], pos[index[b]], pos[index[c]]);
+        normalize(&circ);
+        dist = closestPointOtherThan(&circ, pos, i);
+        if (dist > bestD) {
+            bestPoint = circ;
+            bestD = dist;
+        }
     }
-        
-    closest(pos, i, 6, d, index);
-    if (d[2]-d[0] > eps) {
-        vec3 source;
-        source.x = 0.5 * (pos[index[0]].x + pos[index[1]].x);
-        source.y = 0.5 * (pos[index[0]].y + pos[index[1]].y);
-        source.z = 0.5 * (pos[index[0]].z + pos[index[1]].z);
-        cleanupFrom(&source, pos, i, index, eps, d[4]-d[0]);
-    }
+    
+    pos[i] = bestPoint;
 }
 
-void cleanup(vec3* pos, double eps) {
-    if (N<7)
-        return; // we don't usually need this step for small numbers
+void cleanup(vec3* pos) {
+    if (N < 7)
+        return;
     int i;
-
-    for (i=0;i<N;i++) {
-        cleanupPoint(pos, i, eps);
-    }
+    for (i=0; i<N; i++)
+        cleanupPointCircumcenter(pos, i);
 }
 
 int
@@ -464,7 +539,7 @@ main(int argc, char** argv) {
             for (i=0;i<N;i++)
                 pos[i] = best[i];
             for (i=0;i<50;i++) {
-                cleanup(pos, minD * 0.001 / i);
+                cleanup(pos);
                 calculateMinD();
                 if (animation) 
                     dumpFrame(nIter+i,pos,minD);
