@@ -257,7 +257,6 @@ void cleanupFrom(vec3* from, vec3* pos, int i, int* neighbors, double eps, doubl
     double a;
     
     double myMinD = minDAmongNeighbors(pos, &pos[i], neighbors);
-    printf("Cleaning %d %g %g\n", i, myMinD, maxMove);
     vec3 adjusted;
     vec3 base = pos[i];
     
@@ -272,7 +271,6 @@ void cleanupFrom(vec3* from, vec3* pos, int i, int* neighbors, double eps, doubl
         myMinD = adjMinD;
         pos[i] = adjusted;
     }
-    printf("Cleaned %d %g\n", i, myMinD);
 }
 
 void cleanupPoint(vec3* pos, int i, double eps) {
