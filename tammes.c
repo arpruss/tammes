@@ -10,6 +10,7 @@
 
 #define GA 2.39996322972865332
 
+int frame = 0;
 int asymmetric = 1;
 int N;
 double minD = 0;
@@ -285,12 +286,12 @@ void usage(void) {
     fprintf(stderr, "tammes [-animate | -scad] [-repeat repeatCount] [-friction frictionMultiplier] nPoints [nIterations]\n");
 }
 
-void dumpFrame(int frameCount, vec3* positions, double minD) {
+void dumpFrame(vec3* positions, double minD) {
     int i;
     printf("minD %.9f\n", minD);
     for(i=0;i<N;i++) 
         printf("pos %d %.9f %.9f %.9f\n", i, positions[i].x, positions[i].y, positions[i].z);
-    printf("frame %d\n", frameCount);
+    printf("frame %d\n", frame++);
     fflush(stdout);
 }
 
@@ -378,6 +379,7 @@ void cleanupPointCircumcenter(vec3* pos, int i) {
 void cleanup(vec3* pos) {
     if (N < 7)
         return;
+    
     int i;
     for (i=0; i<N; i++)
         cleanupPointCircumcenter(pos, i);
@@ -391,6 +393,8 @@ main(int argc, char** argv) {
     int scad = 0;
     int golden = 0;
     double frictionMultiplier = 0.16;
+    vec3* bestInRun;
+    double bestMinDInRun = 0;
     
     while (argc >= 2 && argv[1][0] == '-') {
         switch(argv[1][1]) {
@@ -446,7 +450,8 @@ main(int argc, char** argv) {
     // we waste a bit of memory when N is even, but memory is cheap
     v = safemalloc(sizeof(vec3)*N);
     best = safemalloc(sizeof(vec3)*N);
-    srand(time(0));
+    bestInRun = safemalloc(sizeof(vec3)*N);
+    srand((unsigned int)time(0));
     vec3 origin;
     origin.x = origin.y = origin.z = 0.;
     int i;
@@ -496,15 +501,18 @@ main(int argc, char** argv) {
         double nextShow = 0;
 
         calculateMinD();
-        if (bestMinD <= minD) {
+        if (minD > bestMinD) {
             for (i=0;i<N;i++)
                 best[i] = pos[i];
             bestMinD = minD;
         }
+        for (i=0;i<N;i++)
+            bestInRun[i] = pos[i];
+        bestMinDInRun = minD;
         
         if (animation) {
             printf("n %d\n",N);
-            dumpFrame(0,pos,minD);
+            dumpFrame(pos,minD);
         }
 
         for (i=0;i<nIter;i++) {
@@ -526,34 +534,45 @@ main(int argc, char** argv) {
                 }
                 bestMinD = minD;
             }
+            if (minD > bestMinDInRun) {
+                int j;
+                for (j=0;j<N;j++)
+                    bestInRun[j] = pos[j];
+                bestMinDInRun = minD;
+            }
+        
             if ((double)i/(nIter-1) >= nextShow || i == nIter-1) {
                 fprintf(stderr, "%.0f%% minD=%.5f maxMinD=%.5f bestD=%.5f bestMaxMinD=%.5f p=%.5f       \r", 100.*i/(nIter-1), minD, maxMinD(pos), bestMinD, maxMinD(best), p);
                 nextShow += 0.05;
             }
             if (animation) 
-                dumpFrame(i+1,pos,minD);
+                dumpFrame(pos,minD);
         }
         fprintf(stderr, "\n");
 
         if (N >= 7) {
             for (i=0;i<N;i++)
-                pos[i] = best[i];
-            for (i=0;i<50;i++) {
+                pos[i] = bestInRun[i];
+            for (i=0;i<70;i++) {
                 cleanup(pos);
                 calculateMinD();
                 if (animation) 
-                    dumpFrame(nIter+i,pos,minD);
+                    dumpFrame(pos,minD);
                 fprintf(stderr, "clean(%d) minD=%.5f maxMinD=%.5f     \r", i, minD, maxMinD(pos));
             }
-            bestMinD = minD;
-            for (i=0;i<N;i++)
-                best[i] = pos[i];
+            if (minD > bestMinD) {
+                bestMinD = minD;
+                for (i=0;i<N;i++)
+                    best[i] = pos[i];
+            }
             fprintf(stderr, "\n");
         }
     }
     
+    fprintf(stderr, "best: minD=%.5f maxMinD=%.5f\n", bestMinD, maxMinD(best));
+
     if (animation)
-        dumpFrame(nIter+N>=7?50+nIter:nIter,best,bestMinD);
+        dumpFrame(best,bestMinD);
     else if (scad) {
         printf("n=%d;\nminD=%.9f;\n", N, bestMinD);
         //printf("bumpR = 2*sin((1/2)*asin(minD/2));\n");
@@ -581,6 +600,7 @@ main(int argc, char** argv) {
     }
     
     free(v);
+    free(bestInRun);
     free(best);
     free(pos);
     
