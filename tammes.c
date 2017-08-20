@@ -574,24 +574,57 @@ main(int argc, char** argv) {
     if (animation)
         dumpFrame(best,bestMinD);
     else if (scad) {
-        printf("n=%d;\nminD=%.9f;\n", N, bestMinD);
+        puts(
+             "diameter=42.7;\n"
+             "split=false;\n"
+             "horizontalTolerance = 0.3; // for joining halves\n"
+             "verticalTolerance = 1.2;\n"
+             "chamfer = 0.5;\n");
+        
+        printf("n=%d;\n"
+               "minD=%.9f;\n\n", N, bestMinD);
         //printf("bumpR = 2*sin((1/2)*asin(minD/2));\n");
         printf("points = [");
         for(i=0;i<N;i++) {
             printf("[%.9f,%.9f]", latitude(&best[i]), longitude(&best[i]));
             if (i+1 < N) putchar(',');
         }
-        puts ("];\n\n");
-        puts ("module dimple() {");
-        puts (" translate([0,0,1]) sphere(d=minD,$fn=12);");
-        puts ("}\n");
-        puts ("module dimples() {");
-        puts (" union() {");
-        puts ("  for(i=[0:len(points)-1]) rotate([0,0,points[i][1]]) rotate([90-points[i][0],0,0]) dimple();");
-        puts (" }");
-        puts ("}\n");
-        puts ("render(convexity=2)");
-        puts("difference() {\n sphere(r=1,$fn=36);\n dimples();\n}");
+        puts ("];\n\n"
+              "module dimple() {\n"
+              " translate([0,0,1]) sphere(d=minD,$fn=12);\n"
+              "}\n\n"
+              "module dimples() {\n"
+              " union() {\n"
+              "  for(i=[0:len(points)-1]) rotate([0,0,points[i][1]]) rotate([90-points[i][0],0,0]) dimple();\n"
+              " }\n"
+              "}\n\n"
+              "module golfball() {\n"
+              " render(convexity=2)\n"
+              "  scale(diameter/2)\n"
+              "   difference() { sphere(r=1,$fn=36); dimples();}\n"
+              "}\n\n"
+              "module half(upper=true) {\n"
+              "  d1 = diameter*.4+2*horizontalTolerance;\n"
+              "  render(convexity=1) {\n"
+              "   rotate([upper?0:180,0,0]) golfball();\n"
+              "   translate([0,0,-diameter*.25-verticalTolerance])\n"
+              "    cylinder(d=d1, h=diameter*.5+2*verticalTolerance, $fn=40);\n"
+              "   translate([0,0,-0.001])\n"
+              "    cylinder(d1=d1+2*chamfer, d2=d1, h=chamfer);\n"
+              "  }\n"
+              "}\n\n"
+              "module halves() {\n"
+              "  half();\n"
+              "  translate([-8-diameter,0,0]) half();\n"
+              "  translate([10+diameter/2,0,0])\n"
+              "  render(convexity=0)\n"
+              "  intersection() {\n"
+              "      cylinder(d=diameter*.4,h=diameter*.5, $fn=40);\n"
+              "      cylinder(d1=diameter*.4-2*chamfer+2*diameter*.5,d2=diameter*.4-2*chamfer, h=diameter*.5, $fn=40);\n"
+              "  }\n"
+              "}\n\n"
+              "if (split) halves(); else golfball();\n"
+              );
     }
     else {
         for(i=0;i<N;i++) {

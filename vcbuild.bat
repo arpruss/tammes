@@ -1,1 +1,1 @@
-cl tammes.c /GS /Qpar /GL /analyze- /W3 /Gy /Zc:wchar_t /Zi /Gm- /O2 /Ob2 /sdl /Zc:inline /fp:precise /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_UNICODE" /D "UNICODE" /errorReport:prompt /WX- /Zc:forScope /arch:SSE2 /Gd /Oy /Oi /MT /openmp /Ot 
+cl tammes.c /MT /GS /Qpar /GL /analyze- /W3 /Gy /Zc:wchar_t /Gm- /O2 /Ob2 /sdl /Zc:inline /fp:precise /D "WIN32" /D "NDEBUG" /D "_CONSOLE" /D "_UNICODE" /D "UNICODE" /errorReport:prompt /WX- /Zc:forScope /arch:SSE2 /Gd /Oy /Oi /MT /openmp /Ot 
